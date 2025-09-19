@@ -1,8 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import * as tf from "@tensorflow/tfjs";
-import "@tensorflow/tfjs-react-native";
-import { cameraWithTensors } from "@tensorflow/tfjs-react-native";
-import { Camera } from "expo-camera";
+import { CameraView, Camera } from "expo-camera";
 import { useEffect, useState } from "react";
 import {
   Alert,
@@ -60,12 +57,21 @@ export default function RecordingScreen() {
   // CAMERA PERMISSION
   useEffect(() => {
     (async () => {
-      const { status: cameraStatus } = await CameraView.requestCameraPermissionsAsync();
+      const { status: cameraStatus } = await Camera.requestCameraPermissionsAsync();
       const { status: microphoneStatus } = await Camera.requestMicrophonePermissionsAsync();
       setPermission(cameraStatus === "granted" && microphoneStatus === "granted");
 
-      await tf.ready();
-      console.log("✅ TensorFlow ready for React Native");
+      // Initialize TensorFlow only in browser environment
+      if (typeof window !== 'undefined' && typeof navigator !== 'undefined') {
+        try {
+          const tf = await import("@tensorflow/tfjs");
+          await import("@tensorflow/tfjs-react-native");
+          await tf.ready();
+          console.log("✅ TensorFlow ready for React Native");
+        } catch (error) {
+          console.warn("TensorFlow initialization failed:", error);
+        }
+      }
     })();
   }, []);
 
@@ -131,13 +137,20 @@ export default function RecordingScreen() {
         </View>
 
         <View style={styles.cameraContainer}>
-          <Camera
+          <CameraView
             ref={cameraRef as any} // cast to any
             style={styles.camera}
-            type={Camera.Constants.Type.front}
-            onCameraReady={() => {
-              const TensorCamera = cameraWithTensors(Camera as any);
-              setCameraTensorRef(TensorCamera);
+            facing="front"
+            onCameraReady={async () => {
+              if (typeof window !== 'undefined' && typeof navigator !== 'undefined') {
+                try {
+                  const { cameraWithTensors } = await import("@tensorflow/tfjs-react-native");
+                  const TensorCamera = cameraWithTensors(CameraView as any);
+                  setCameraTensorRef(TensorCamera);
+                } catch (error) {
+                  console.warn("Failed to initialize tensor camera:", error);
+                }
+              }
             }}
           />
 

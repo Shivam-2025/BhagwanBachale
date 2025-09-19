@@ -24,21 +24,20 @@ author = "agent"
 [workflows.workflow.metadata]
 outputType = "webview"
 
-# 👇 Install ngrok before running expo
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm install --save-dev @expo/ngrok@^4.1.0"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npx expo start --web --port 5000 --tunnel"
+args = "npx expo start --web --port 5000"
 waitForPort = 5000
 
 [[ports]]
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 34349
+externalPort = 3000
+
 [deployment]
 deploymentTarget = "autoscale"
-run = ["npx", "serve", "-s", "dist", "-l", "5000"]
+run = ["npx", "expo", "start", "--web", "--port"]
 build = ["npx", "expo", "export", "--platform", "web"]

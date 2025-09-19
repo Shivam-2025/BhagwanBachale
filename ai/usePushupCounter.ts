@@ -1,37 +1,46 @@
-import * as posenet from "@tensorflow-models/posenet";
-import * as tf from "@tensorflow/tfjs";
-import "@tensorflow/tfjs-react-native";
 import { useEffect, useRef, useState } from "react";
 
 export function usePushupCounter() {
   const [count, setCount] = useState(0);
-  const netRef = useRef<posenet.PoseNet | null>(null);
+  const netRef = useRef<any | null>(null);
   const goingDownRef = useRef(false);
 
   useEffect(() => {
     const init = async () => {
-      // 1️⃣ Prepare TensorFlow JS
-      await tf.ready();
-      await tf.setBackend("rn-webgl"); // RN GPU backend
-      console.log("✅ TensorFlow ready with rn-webgl backend");
+      // Only initialize in browser environment
+      if (typeof window !== 'undefined' && typeof navigator !== 'undefined') {
+        try {
+          // Dynamic imports to avoid SSR issues
+          const posenet = await import("@tensorflow-models/posenet");
+          const tf = await import("@tensorflow/tfjs");
+          await import("@tensorflow/tfjs-react-native");
+          
+          // 1️⃣ Prepare TensorFlow JS
+          await tf.ready();
+          await tf.setBackend("rn-webgl"); // RN GPU backend
+          console.log("✅ TensorFlow ready with rn-webgl backend");
 
-      // 2️⃣ Load PoseNet model
-      const net = await posenet.load({
-        architecture: "MobileNetV1",
-        outputStride: 16,
-        inputResolution: { width: 257, height: 257 },
-        multiplier: 0.75,
-      });
+          // 2️⃣ Load PoseNet model
+          const net = await posenet.load({
+            architecture: "MobileNetV1",
+            outputStride: 16,
+            inputResolution: { width: 257, height: 257 },
+            multiplier: 0.75,
+          });
 
-      netRef.current = net;
-      console.log("✅ PoseNet loaded");
+          netRef.current = net;
+          console.log("✅ PoseNet loaded");
+        } catch (error) {
+          console.warn("PoseNet initialization failed:", error);
+        }
+      }
     };
 
     init();
   }, []);
 
   // 3️⃣ Detect push-ups from camera frame or tensor
-  const detect = async (input: tf.Tensor3D | any) => {
+  const detect = async (input: any) => {
     if (!netRef.current) return;
 
     const pose = await netRef.current.estimateSinglePose(input, {
