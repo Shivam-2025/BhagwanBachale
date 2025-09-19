@@ -1,10 +1,9 @@
-import React from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
   ImageBackground,
+  StyleSheet,
+  Text,
   TouchableOpacity,
+  View,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 
@@ -117,6 +116,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 20,
     marginBottom: 16,
+    marginTop: 77,
   },
   badgeDot: {
     width: 8,

@@ -1,117 +1,200 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as tf from "@tensorflow/tfjs";
+import "@tensorflow/tfjs-react-native";
+import { cameraWithTensors } from "@tensorflow/tfjs-react-native";
 import { Camera } from "expo-camera";
-import { Ionicons } from "@expo/vector-icons";
+import { useEffect, useState } from "react";
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { usePushupCounter } from "../ai/usePushupCounter";
+import { useRecorder } from "../hooks/useRecorder";
 
-type Exercise = "pushups" | "situps" | "jump" | "pullups";
-type RecordingState = "idle" | "recording" | "preview" | "uploading" | "success";
+type ExerciseId = "pushups" | "situps" | "jump" | "pullups";
 
-// ✅ format timer (MM:SS)
-const formatTime = (seconds: number) => {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins.toString().padStart(2, "0")}:${secs
-    .toString()
-    .padStart(2, "0")}`;
-};
+interface Exercise {
+  id: ExerciseId;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  title: string;
+  description: string;
+}
+
+const EXERCISES: Exercise[] = [
+  { id: "pushups", icon: "weight-lifter", title: "Push-ups", description: "Record continuous push-ups" },
+  { id: "situps", icon: "seat", title: "Sit-ups", description: "Record abdominal crunches" },
+  { id: "jump", icon: "run-fast", title: "Vertical Jump", description: "Record maximum jump height" },
+  { id: "pullups", icon: "arm-flex", title: "Pull-ups", description: "Record upper body strength" },
+];
+
+const AICounter = ({ count }: { count: number }) => (
+  <View style={styles.counterBox}>
+    <Text style={styles.counterLabel}>Push-ups Detected</Text>
+    <Text style={styles.counterValue}>{count}</Text>
+  </View>
+);
+
+const IdleCameraView = () => (
+  <View style={styles.idleContainer}>
+    <MaterialCommunityIcons name="dumbbell" size={36} color="#475569" />
+    <Text style={styles.idleTitle}>Ready to Record Push-ups</Text>
+    <Text style={styles.idleSubtitle}>Position yourself in frame and tap record</Text>
+  </View>
+);
 
 export default function RecordingScreen() {
-  const [selectedExercise, setSelectedExercise] = useState<Exercise>("pushups");
-  const [recordingState, setRecordingState] = useState<RecordingState>("idle");
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [recordingTime, setRecordingTime] = useState(0);
+  const [selectedExercise, setSelectedExercise] = useState<ExerciseId>("pushups");
+  const { cameraRef, videoUri, isRecording, startRecording, stopRecording } = useRecorder();
+  const { count, detect, reset } = usePushupCounter();
+  const [permission, setPermission] = useState<boolean | null>(null);
 
+  // --- Camera tensor ref
+  const [textureDims, setTextureDims] = useState({ width: 1920, height: 1080 });
+  const [cameraTensorRef, setCameraTensorRef] = useState<any>(null);
+
+  // CAMERA PERMISSION
   useEffect(() => {
     (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === "granted");
+      const { status: cameraStatus } = await CameraView.requestCameraPermissionsAsync();
+      const { status: microphoneStatus } = await Camera.requestMicrophonePermissionsAsync();
+      setPermission(cameraStatus === "granted" && microphoneStatus === "granted");
+
+      await tf.ready();
+      console.log("✅ TensorFlow ready for React Native");
     })();
   }, []);
 
-  // 🕒 Timer effect
+  // Pose detection loop
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (recordingState === "recording") {
-      setRecordingTime(0);
-      interval = setInterval(() => {
-        setRecordingTime((t) => t + 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [recordingState]);
+    let animationFrame: number | null = null;
 
-  if (hasPermission === null) return <Text>Requesting camera permission...</Text>;
-  if (hasPermission === false) return <Text>No access to camera</Text>;
+    const loop = async () => {
+      if (isRecording && cameraTensorRef) {
+        const nextFrame = await cameraTensorRef.takePictureAsync({ skipProcessing: true });
+        await detect(nextFrame);
+        animationFrame = requestAnimationFrame(loop);
+      }
+    };
 
-  const handleRecord = () => {
-    if (recordingState === "idle") {
-      setRecordingState("recording");
-    } else if (recordingState === "recording") {
-      setRecordingState("preview");
-    } else if (recordingState === "preview") {
-      setRecordingState("uploading");
-      setTimeout(() => setRecordingState("success"), 2000);
-      setTimeout(() => setRecordingState("idle"), 4000);
+    if (isRecording) loop();
+    else if (animationFrame !== null) cancelAnimationFrame(animationFrame);
+
+    return () => {
+      if (animationFrame !== null) cancelAnimationFrame(animationFrame);
+    };
+  }, [isRecording, cameraTensorRef]);
+
+  const handleRecordPress = async () => {
+    if (!isRecording) {
+      reset();
+      await startRecording();
+    } else {
+      stopRecording();
     }
   };
 
+  const handleRetake = () => reset();
+  const handleUpload = () => Alert.alert("Upload", `Uploading video: ${videoUri}`);
+
+  if (permission === null)
+    return <View style={styles.centered}><Text>Checking permissions...</Text></View>;
+  if (!permission)
+    return <View style={styles.centered}><Text>No camera access</Text></View>;
+
   return (
-    <View style={styles.container}>
-      {/* ... exercise selector (same as before) ... */}
+    <SafeAreaView style={styles.container}>
+      <Text style={styles.heading}>Recording Studio</Text>
+      <Text style={styles.subHeading}>Record your athletic performance for AI-powered assessment</Text>
 
-      {/* Camera + Overlays */}
-      <View style={styles.cameraWrapper}>
-        <Camera style={styles.camera} type="front" />
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.exerciseCard}>
+          <Text style={styles.cardTitle}>Select Exercise</Text>
+          {EXERCISES.map((ex) => {
+            const isActive = selectedExercise === ex.id;
+            return (
+              <TouchableOpacity key={ex.id} style={[styles.exerciseButton, isActive && styles.exerciseButtonActive]} onPress={() => setSelectedExercise(ex.id)}>
+                <View style={[styles.iconContainer, isActive && styles.iconContainerActive]}>
+                  <MaterialCommunityIcons name={ex.icon} size={22} color={isActive ? "#3B82F6" : "#64748B"} />
+                </View>
+                <View style={{ flexShrink: 1 }}>
+                  <Text style={[styles.exerciseTitle, isActive && styles.exerciseTitleActive]}>{ex.title}</Text>
+                  <Text style={styles.exerciseDescription}>{ex.description}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-        {/* ✅ Timer overlay */}
-        {recordingState === "recording" && (
-          <View style={styles.timer}>
-            <View style={styles.timerDot} />
-            <Text style={styles.timerText}>{formatTime(recordingTime)}</Text>
-          </View>
-        )}
+        <View style={styles.cameraContainer}>
+          <Camera
+            ref={cameraRef as any} // cast to any
+            style={styles.camera}
+            type={Camera.Constants.Type.front}
+            onCameraReady={() => {
+              const TensorCamera = cameraWithTensors(Camera as any);
+              setCameraTensorRef(TensorCamera);
+            }}
+          />
 
-        {/* (keep AICounter + CheatAlert here) */}
-      </View>
+          {isRecording ? <AICounter count={count} /> : <IdleCameraView />}
 
-      {/* Record button (same as before) */}
-    </View>
+          {videoUri && !isRecording ? (
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <TouchableOpacity style={[styles.recordButton, { backgroundColor: "#F59E0B" }]} onPress={handleRetake}>
+                <Text style={styles.recordButtonText}>Retake</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.recordButton, { backgroundColor: "#10B981" }]} onPress={handleUpload}>
+                <Text style={styles.recordButtonText}>Upload</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.recordButton} onPress={handleRecordPress}>
+              <View style={isRecording ? styles.stopIcon : styles.recordIcon} />
+              <Text style={styles.recordButtonText}>{isRecording ? "Stop" : "Record"}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {videoUri && <Text style={styles.statusText}>Video saved at: {videoUri}</Text>}
+        <Text style={styles.statusText}>Status: {isRecording ? "recording" : "idle"}</Text>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8fafc", padding: 16 },
-  cameraWrapper: {
-    flex: 1,
-    borderRadius: 12,
-    overflow: "hidden",
-    backgroundColor: "black",
-  },
-  camera: { flex: 1 },
 
-  // ✅ Timer styles
-  timer: {
-    position: "absolute",
-    top: 20,
-    right: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(220,38,38,0.9)",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  timerDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "white",
-    marginRight: 6,
-  },
-  timerText: {
-    color: "white",
-    fontFamily: "monospace",
-    fontWeight: "bold",
-    fontSize: 14,
-  },
+// --- STYLES ---
+const styles = StyleSheet.create({
+  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
+  container: { flex: 1, backgroundColor: "#F7F8FA", paddingHorizontal: 16 },
+  heading: { fontSize: 24, fontWeight: "bold", color: "#1E293B", marginTop: 16 },
+  subHeading: { fontSize: 14, color: "#64748B", marginBottom: 16 },
+  scrollContainer: { paddingBottom: 32 },
+  exerciseCard: { backgroundColor: "#fff", borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: "#E2E8F0" },
+  cardTitle: { fontSize: 16, fontWeight: "600", color: "#334155", marginBottom: 12 },
+  exerciseButton: { flexDirection: "row", alignItems: "center", padding: 10, borderRadius: 8, marginVertical: 4 },
+  exerciseButtonActive: { backgroundColor: "#EFF6FF", borderColor: "#3B82F6", borderWidth: 1 },
+  iconContainer: { width: 36, height: 36, borderRadius: 8, backgroundColor: "#F1F5F9", justifyContent: "center", alignItems: "center", marginRight: 10 },
+  iconContainerActive: { backgroundColor: "#DBEAFE" },
+  exerciseTitle: { fontSize: 14, fontWeight: "500", color: "#334155" },
+  exerciseTitleActive: { color: "#1E3A8A" },
+  exerciseDescription: { fontSize: 12, color: "#64748B", marginTop: 2 },
+  cameraContainer: { height: 400, backgroundColor: "#020617", borderRadius: 16, justifyContent: "center", alignItems: "center", marginBottom: 24, overflow: "hidden" },
+  camera: { ...StyleSheet.absoluteFillObject },
+  statusText: { fontSize: 13, color: "#475569", marginTop: 4 },
+  counterBox: { position: "absolute", top: 12, left: 12, backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  counterLabel: { color: "#E2E8F0", fontSize: 12 },
+  counterValue: { color: "#fff", fontSize: 24, fontWeight: "bold" },
+  idleContainer: { justifyContent: "center", alignItems: "center", padding: 12 },
+  idleTitle: { color: "#fff", fontSize: 18, fontWeight: "600", marginTop: 12 },
+  idleSubtitle: { color: "#94A3B8", fontSize: 12, marginTop: 4, textAlign: "center" },
+  recordButton: { position: "absolute", bottom: 16, backgroundColor: "#EF4444", width: 100, height: 44, borderRadius: 22, justifyContent: "center", alignItems: "center", flexDirection: "row", gap: 6 },
+  recordButtonText: { color: "#fff", fontSize: 14, fontWeight: "600" },
+  recordIcon: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#fff" },
+  stopIcon: { width: 10, height: 10, borderRadius: 2, backgroundColor: "#fff" },
 });

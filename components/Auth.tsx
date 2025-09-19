@@ -1,21 +1,27 @@
 // Auth.tsx
 import React, { useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  ImageBackground,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-  ImageBackground,
+  View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Button from './Button';
 
 type AuthMode = 'login' | 'register';
 
-export default function Auth({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
+export default function Auth({
+  onAuthSuccess,
+  onBack,
+}: {
+  onAuthSuccess?: () => void;
+  onBack?: () => void; // ✅ back handler
+}) {
   const [mode, setMode] = useState<AuthMode>('login');
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -48,6 +54,13 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess?: () => void }) 
     >
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.card}>
+          {/* ✅ Back Button */}
+          {onBack && (
+            <TouchableOpacity style={styles.backButton} onPress={onBack}>
+              <Icon name="arrow-back-ios" size={20} color="#334155" />
+            </TouchableOpacity>
+          )}
+
           {/* Icon */}
           <View style={styles.iconBox}>
             <Icon name="sports" size={28} color="#fff" />
@@ -173,6 +186,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.9)',
     borderRadius: 16,
     padding: 20,
+    position: 'relative',
+  },
+  backButton: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    zIndex: 10,
+    padding: 6,
   },
   iconBox: {
     width: 64,
@@ -183,6 +204,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'center',
     marginBottom: 16,
+    marginTop: 16, // ✅ extra margin so icon doesn’t clash with back button
   },
   title: {
     fontSize: 22,

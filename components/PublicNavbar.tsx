@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  View,
+  Dimensions,
+  Platform,
+  StatusBar,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  Animated,
+  View,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 
@@ -20,6 +22,17 @@ export default function PublicNavbar({
   onNavigate,
 }: PublicNavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSmallScreen, setIsSmallScreen] = useState(
+    Dimensions.get("window").width < 500
+  );
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsSmallScreen(Dimensions.get("window").width < 500);
+    };
+    const sub = Dimensions.addEventListener("change", handleResize);
+    return () => sub.remove();
+  }, []);
 
   const handleLogoClick = () => {
     if (onNavigate) {
@@ -40,26 +53,29 @@ export default function PublicNavbar({
         </View>
       </TouchableOpacity>
 
-      {/* Right: Auth Buttons (desktop → here always visible) */}
-      <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.loginBtn} onPress={onLoginClick}>
-          <Text style={styles.btnText}>Login</Text>
+      {/* Right side */}
+      {!isSmallScreen ? (
+        // ✅ Large screen: show buttons inline
+        <View style={styles.buttonRow}>
+          <TouchableOpacity style={styles.loginBtn} onPress={onLoginClick}>
+            <Text style={styles.btnText}>Login</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.signupBtn} onPress={onSignupClick}>
+            <Text style={styles.btnText}>Sign Up</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        // ✅ Small screen: show menu icon
+        <TouchableOpacity
+          style={styles.menuButton}
+          onPress={() => setIsMenuOpen(!isMenuOpen)}
+        >
+          <Icon name={isMenuOpen ? "close" : "menu"} size={24} color="#334155" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.signupBtn} onPress={onSignupClick}>
-          <Text style={styles.btnText}>Sign Up</Text>
-        </TouchableOpacity>
-      </View>
+      )}
 
-      {/* Mobile menu toggle (optional for RN) */}
-      <TouchableOpacity
-        style={styles.menuButton}
-        onPress={() => setIsMenuOpen(!isMenuOpen)}
-      >
-        <Icon name={isMenuOpen ? "close" : "menu"} size={24} color="#334155" />
-      </TouchableOpacity>
-
-      {/* Mobile Menu */}
-      {isMenuOpen && (
+      {/* Mobile Menu (only visible if open) */}
+      {isSmallScreen && isMenuOpen && (
         <View style={styles.mobileMenu}>
           <TouchableOpacity style={styles.loginBtn} onPress={onLoginClick}>
             <Text style={styles.btnText}>Login</Text>
@@ -76,11 +92,11 @@ export default function PublicNavbar({
 const styles = StyleSheet.create({
   navbar: {
     position: "absolute",
-    top: 10,
+    top: Platform.OS === "android" ? StatusBar.currentHeight || 0 : 44,
     left: 0,
     right: 0,
     padding: 12,
-    backgroundColor: "rgba(255,255,255,0.7)",
+    backgroundColor: "rgba(255,255,255,0.9)",
     borderRadius: 16,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -90,6 +106,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 6,
     elevation: 3,
+    zIndex: 50,
   },
   logoContainer: {
     flexDirection: "row",
@@ -115,7 +132,6 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     flexDirection: "row",
-    display: "none", // can show on tablets
   },
   loginBtn: {
     backgroundColor: "#d1fae5",
@@ -123,6 +139,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     marginRight: 8,
+    marginBottom: 8,
   },
   signupBtn: {
     backgroundColor: "#dbeafe",
@@ -145,5 +162,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     elevation: 4,
+    zIndex: 55,
   },
 });

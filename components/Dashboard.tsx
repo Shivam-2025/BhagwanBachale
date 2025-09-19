@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
   ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 
@@ -87,7 +87,7 @@ export default function Dashboard() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Mission Control</Text>
+          <Text style={styles.headerTitle}>Performance Vault</Text>
           <Text style={styles.headerSubtitle}>
             Your athletic performance dashboard
           </Text>
@@ -164,20 +164,32 @@ export default function Dashboard() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f8fafc", padding: 16 },
-  header: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
+  header: { 
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    marginBottom: 16, 
+    alignItems: "center",
+    flexWrap: "wrap",   // ✅ allow wrapping on small screens
+  },
   headerTitle: { fontSize: 24, fontWeight: "bold", color: "#1e293b" },
   headerSubtitle: { fontSize: 14, color: "#475569" },
-  headerActions: { flexDirection: "row", alignItems: "center" },
+  headerActions: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    flexShrink: 1, 
+    flexWrap: "wrap",   // ✅ ensure actions wrap instead of overflowing
+  },
   syncBtn: {
     flexDirection: "row",
     alignItems: "center",
-    marginLeft: 12,
+    marginLeft: 8,
+    marginTop: 6, // ✅ space when wrapped to new line
     backgroundColor: "white",
     paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     borderRadius: 8,
   },
-  syncBtnText: { marginLeft: 6, color: "#334155", fontSize: 14 },
+  syncBtnText: { marginLeft: 4, color: "#334155", fontSize: 13 },
   syncBadge: {
     flexDirection: "row",
     alignItems: "center",

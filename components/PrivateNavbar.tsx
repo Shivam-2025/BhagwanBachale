@@ -1,11 +1,13 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
-  View,
+  Animated,
+  Dimensions,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  Modal,
-  Pressable,
+  View,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 
@@ -21,125 +23,135 @@ export default function PrivateNavbar({
   onLogout,
 }: PrivateNavbarProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const slideAnim = useRef(new Animated.Value(-260)).current; // hidden at start
 
   const menuItems = [
     { view: "dashboard", icon: "📊", label: "Dashboard" },
     { view: "profile", icon: "👤", label: "Profile" },
-    { view: "recording", icon: "📹", label: "Record" },
     { view: "leaderboard", icon: "🏆", label: "Leaderboard" },
-    { view: "achievements", icon: "🏅", label: "Badges" },
+    { view: "achievements", icon: "🏅", label: "Achievements" },
+    { view: "recording", icon: "📹", label: "Record" },
   ];
 
-  const handleLogoClick = () => {
-    onNavigate("dashboard");
+  // ✅ Toggle sidebar
+  const toggleSidebar = () => {
+    if (sidebarOpen) {
+      // close
+      Animated.timing(slideAnim, {
+        toValue: -260,
+        duration: 250,
+        useNativeDriver: false,
+      }).start(() => setSidebarOpen(false));
+    } else {
+      // open
+      setSidebarOpen(true);
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: false,
+      }).start();
+    }
+  };
+
+  const closeSidebar = () => {
+    Animated.timing(slideAnim, {
+      toValue: -260,
+      duration: 250,
+      useNativeDriver: false,
+    }).start(() => setSidebarOpen(false));
   };
 
   return (
     <>
       {/* Top Navbar */}
-      <View style={styles.navbar}>
-        {/* Logo */}
-        <TouchableOpacity style={styles.logoContainer} onPress={handleLogoClick}>
-          <View style={styles.logoIcon}>
-            <Icon name="sports-soccer" size={20} color="#fff" />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.navbar}>
+          <View style={styles.logoContainer}>
+            <View style={styles.logoIcon}>
+              <Icon name="sports-soccer" size={20} color="#fff" />
+            </View>
+            <View>
+              <Text style={styles.logoTitle}>KhelSaksham</Text>
+              <Text style={styles.logoSubtitle}>खेळ सक्षम</Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.logoTitle}>KhelSaksham</Text>
-            <Text style={styles.logoSubtitle}>खेळ सक्षम</Text>
-          </View>
-        </TouchableOpacity>
 
-        {/* Menu Buttons */}
-        <View style={styles.menuRow}>
-          {menuItems.map(({ view, icon, label }) => (
-            <TouchableOpacity
-              key={view}
-              style={[
-                styles.menuButton,
-                currentView === view && styles.menuButtonActive,
-              ]}
-              onPress={() => onNavigate(view)}
-            >
-              <Text style={styles.menuIcon}>{icon}</Text>
-              <Text
-                style={[
-                  styles.menuText,
-                  currentView === view && styles.menuTextActive,
-                ]}
-              >
-                {label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Logout */}
-        <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
-          <Text style={styles.logoutText}>🚪 Logout</Text>
-        </TouchableOpacity>
-
-        {/* Hamburger (mobile) */}
-        <TouchableOpacity
-          style={styles.hamburger}
-          onPress={() => setSidebarOpen(true)}
-        >
-          <Icon name="menu" size={28} color="#334155" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Sidebar (mobile) */}
-      <Modal visible={sidebarOpen} animationType="slide" transparent>
-        <Pressable
-          style={styles.overlay}
-          onPress={() => setSidebarOpen(false)}
-        />
-        <View style={styles.sidebar}>
-          <Text style={styles.sidebarTitle}>📊 Menu</Text>
-          {menuItems.map(({ view, icon, label }) => (
-            <TouchableOpacity
-              key={view}
-              style={[
-                styles.sidebarItem,
-                currentView === view && styles.sidebarItemActive,
-              ]}
-              onPress={() => {
-                onNavigate(view);
-                setSidebarOpen(false);
-              }}
-            >
-              <Text style={styles.menuIcon}>{icon}</Text>
-              <Text style={styles.sidebarText}>{label}</Text>
-            </TouchableOpacity>
-          ))}
-          <TouchableOpacity
-            style={[styles.sidebarItem, { marginTop: "auto" }]}
-            onPress={() => {
-              onLogout();
-              setSidebarOpen(false);
-            }}
-          >
-            <Text style={styles.logoutText}>🚪 Logout</Text>
+          <TouchableOpacity style={styles.hamburger} onPress={toggleSidebar}>
+            <Icon name="menu" size={28} color="#334155" />
           </TouchableOpacity>
         </View>
-      </Modal>
+      </SafeAreaView>
+
+      {/* Sidebar */}
+      {sidebarOpen && (
+        <>
+          <Pressable style={styles.overlay} onPress={closeSidebar} />
+          <Animated.View style={[styles.sidebar, { left: slideAnim }]}>
+            <Text style={styles.sidebarTitle}>📋 Menu</Text>
+
+            {menuItems.map(({ view, icon, label }) => (
+              <TouchableOpacity
+                key={view}
+                style={[
+                  styles.sidebarItem,
+                  currentView === view && styles.sidebarItemActive,
+                ]}
+                onPress={() => {
+                  onNavigate(view);
+                  closeSidebar();
+                }}
+              >
+                <Text style={styles.sidebarIcon}>{icon}</Text>
+                <Text
+                  style={[
+                    styles.sidebarText,
+                    currentView === view && styles.sidebarTextActive,
+                  ]}
+                >
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            <TouchableOpacity
+              style={[styles.sidebarItem, { marginTop: "auto" }]}
+              onPress={() => {
+                onLogout();
+                closeSidebar();
+              }}
+            >
+              <Text style={styles.sidebarIcon}>🚪</Text>
+              <Text style={[styles.sidebarText, { color: "#dc2626" }]}>
+                Logout
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </>
+      )}
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    backgroundColor: "rgba(255,255,255,0.95)",
+    zIndex: 1000,
+  },
   navbar: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 12,
-    backgroundColor: "rgba(255,255,255,0.9)",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#e2e8f0",
     shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 4,
+    position: "relative",
+    zIndex: 1000,
   },
   logoContainer: {
     flexDirection: "row",
@@ -163,73 +175,55 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#64748b",
   },
-  menuRow: {
-    flexDirection: "row",
-    marginLeft: 20,
-  },
-  menuButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginRight: 6,
-  },
-  menuButtonActive: {
-    backgroundColor: "#2563eb",
-  },
-  menuIcon: {
-    fontSize: 16,
-    marginRight: 4,
-  },
-  menuText: {
-    fontSize: 14,
-    color: "#334155",
-  },
-  menuTextActive: {
-    color: "white",
-    fontWeight: "bold",
-  },
-  logoutBtn: {
-    marginLeft: "auto",
-  },
-  logoutText: {
-    color: "#dc2626",
-    fontWeight: "600",
-  },
   hamburger: {
-    marginLeft: 10,
+    padding: 6,
   },
   overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: Dimensions.get("window").width,
+    height: Dimensions.get("window").height,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    zIndex: 900,
   },
   sidebar: {
     position: "absolute",
-    left: 0,
     top: 0,
-    width: 240,
+    width: 260,
     height: "100%",
     backgroundColor: "white",
-    padding: 20,
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    elevation: 6,
+    zIndex: 1000,
   },
   sidebarTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    marginBottom: 16,
+    marginBottom: 20,
+    color: "#1e293b",
   },
   sidebarItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 8,
+    paddingHorizontal: 8,
   },
   sidebarItemActive: {
-    backgroundColor: "#2563eb",
+    backgroundColor: "#dbeafe",
+  },
+  sidebarIcon: {
+    fontSize: 18,
+    marginRight: 8,
   },
   sidebarText: {
-    fontSize: 14,
-    marginLeft: 6,
+    fontSize: 15,
     color: "#334155",
+  },
+  sidebarTextActive: {
+    color: "#2563eb",
+    fontWeight: "600",
   },
 });
